@@ -23,24 +23,15 @@ import matplotlib.cm as cm
 class Data():
     sources: List[str] = []
     nodes: List[str] = []
-    functions: List[str] = []   ## ¿¿¿??? (does this represents carts/catalog/shipping/order/etc...?) ## YES
+    functions: List[str] = []
 
     node_memory_matrix: np.array = np.array([])
     function_memory_matrix: np.array = np.array([])
     node_delay_matrix: np.array = np.array([])
     workload_matrix: np.array = np.array([])
     max_delay_matrix: np.array = np.array([]) 
-    # response_time_matrix: np.array = np.array([])   # We don't need it because is only use for GPU, right? ## DON'T USE IT
     node_cores_matrix: np.array = np.array([])
-    # cores_matrix: np.array = np.array([])           # Where is it used? ## DON'T USE IT
-    # old_allocations_matrix: np.array = np.array([]) # Where is it used? In our case it would be mat_mul? # IGNORE IT
     core_per_req_matrix: np.array = np.array([])
-
-    ### gpu_function_memory_matrix: np.array = np.array([])
-    ### gpu_node_memory_matrix: np.array = np.array([])
-
-    # prev_x = np.array([])  ## Use by neptune for GPU ....
-
 
     def __init__(self, sources: List[str], nodes: List[str], functions: List[str]):
         self.sources = sources
@@ -80,26 +71,6 @@ class Input:
     cpu_actual_allocation: np.array = np.array([])
     cpu_core_per_req: np.array = np.array([])
 
-    # x_cpu = np.array([])
-    # c_cpu = np.array([])
-
-    # gpu_nodes: List[str] = []
-    # gpu_functions: List[str] = []
-
-    # gpu_node_memory_matrix: np.array = np.array([])
-    # gpu_function_memory_matrix: np.array = np.array([])
-    # gpu_node_delay_matrix: np.array = np.array([])
-    # gpu_workload_matrix: np.array = np.array([])
-    # gpu_max_delay_matrix: np.array = np.array([])
-    # gpu_response_time_matrix: np.array = np.array([])
-    # gpu_node_memory: np.array = np.array([])
-    # gpu_function_memory: np.array = np.array([])
-
-    # x_gpu = np.array([])
-    # c_gpu = np.array([])
-
-    # cpu_function_gpu_map = {}
-
     def __init__(self,
                  cpu_nodes: List[str], cpu_functions: List[str],
                  gpu_nodes: List[str], gpu_functions: List[str]):
@@ -110,13 +81,6 @@ class Input:
         self.gpu_functions = gpu_functions
         self.functions = cpu_functions + gpu_functions
         self.nodes = cpu_nodes + gpu_nodes
-        # for i, cpu_f in enumerate(cpu_functions):
-        #     cpu_function = cpu_f[:4]
-        #     for j, gpu_f in enumerate(gpu_functions):
-        #         gpu_function = gpu_f[:4]
-        #         if cpu_function == gpu_function:
-        #             self.cpu_function_gpu_map[i] = j
-        #             break
 
     def load_node_memory_matrix(self, matrix: List[int]):
         self.node_memory_matrix = np.array(matrix, dtype=int)
@@ -185,15 +149,12 @@ class Solver:
     num_users=0
     req_by_user=[]
     req_distribution=[]
-    # moved_from = {}
-    # moved_to = {}
     data: Data = None
     
     transformer = Transformer.from_crs('epsg:3857', 'epsg:4326')
 
     #Criticality inputs
     CR_matrix = []
-    #D =(-37.81952,144.95714099999998)  # Danger source position
     D = (round(random.uniform(-0.010, 0.010),3),round(random.uniform(-0.010, 0.010),3)) 
     D_rad = (0.5) # Influence range of danger source D (radius) in km
     U_per = 0  # Perception range of individual uj in km
@@ -225,9 +186,9 @@ class Solver:
         size = len(delay_matrix) # No of nodes
         mds_model = manifold.MDS(n_components=2, random_state=0, dissimilarity='precomputed', normalized_stress="auto") # MDS(dissimilarity='precomputed', normalized_stress='auto', random_state=0)
         mds_model.fit(delay_matrix)
-        coords = mds_model.fit_transform(delay_matrix) # [[-711.64291427 -379.86399722][..][..]]
+        coords = mds_model.fit_transform(delay_matrix)
         for i in range(size):
-            coords[i] = self.cartesian_to_geo(*coords[i]) # [[-0.0034123763 -0.0063927971][..][..]]
+            coords[i] = self.cartesian_to_geo(*coords[i])
         return coords
 
     def get_radius(self, coords, scale_factor = 0.9): # The greater the scale_factor the higher the intersection between the nodes
@@ -289,8 +250,8 @@ class Solver:
         sim = rvo2.PyRVOSimulator(1,    #float timeStep
                                 1.5,    # float MAX neighborDist
                                 self.num_users, # size_t maxNeighbors
-                                1,    # float timeHorizon --->  tiempo de respuesta frente la presencia de otros agentes
-                                2,      # float timeHorizonObst ---> tiempo de respuesta frente a presencia de obstaculos
+                                1,    # float timeHorizon --->  response time in the presence of other agents
+                                2,      # float timeHorizonObst ---> response time in the presence of obstacles
                                 1,      # float radius ---> of agents
                                 pref_vel)      # float maxSpeed ---> of agents
                                     # tuple velocity=(0, 0)
@@ -304,9 +265,9 @@ class Solver:
     
         circle_area = [self.D[0],self.D[1],self.D_rad/111.139]
         circle=[self.D[0],self.D[1],0.05/111.1]
-        xc = circle[0] #x-co of circle (center) 
+        xc = circle[0] # x-co of circle (center) 
         xc_area=circle_area[0]
-        yc = circle[1] #y-co of circle (center) 
+        yc = circle[1] # y-co of circle (center) 
         yc_area= circle_area[1]
         r=circle[2] 
         r_area=circle_area[2]
@@ -325,10 +286,6 @@ class Solver:
             #sim.setAgentPrefVelocity(agents[a], (-2,2))
             #sim.setAgentPrefVelocity(agents[a], (random.randint(-10, 10),random.randint(-10, 10)))
             sim.setAgentPrefVelocity(agents[a], (random.uniform(-pref_vel, pref_vel),random.uniform(-pref_vel, pref_vel)))
-
-        #print('Simulation has %i agents and %i obstacle vertices in it.' %
-                #(sim.getNumAgents(), sim.getNumObstacleVertices()))
-        #print('Running simulation')
     
         positions_T=[]
         fig, ax = plt.subplots(figsize = (10,5))
@@ -338,9 +295,6 @@ class Solver:
 
             positions = ['(%5.8f, %5.8f)' % sim.getAgentPosition(agent_no) for agent_no in (agents)]
             velocities = ['(%3.8f, %3.8f)' % sim.getAgentVelocity(agent_no)for agent_no in (agents)]
-        
-            #print('%s' % ( '  '.join(velocities)))
-            #print('step=%2i  t=%.3f  %s' % (step, sim.getGlobalTime(), '  '.join(positions)))
         
             x_p=[]
             y_p=[]
@@ -386,11 +340,7 @@ class Solver:
             user_coordinates = (user_latitude,user_longitude)
             dist_geoDanger = geopy.distance.geodesic(user_coordinates, self.D).km
             du_Dt.append(dist_geoDanger)
-        
-        # for r in range(self.requests_received):
-        #     for u in range(self.num_users):
-        #         if self.req_by_user[u][r]==1:
-        #             du_Dt_requests[r]=du_Dt[u]
+
         return du_Dt
 
     def get_truncated_normal(self,mean, sd, low, upp):
@@ -478,18 +428,9 @@ class Solver:
     def load_input(self, data: Data):
         self.data = data
 
-        ################## MISSING INPUTS ##################
-
-        # # users_location: coordinates of users
-        # users_location = pd.read_csv('users-test.csv') 
-        # N_src = pd.read_csv('serverstest_3.csv')
-
-        ################## MISSING INPUTS ##################
-        # EXAMPLE USAGE
-
         max_delay = 2000 # millis
-        num_nodes = data.sources # random.randint(3, 20) # gen some nodes
-        self.num_users = 8 # random.randint(num_nodes*2, num_nodes*50) # gen some users
+        num_nodes = data.sources
+        self.num_users = 8
 
         # creates a diagonal matrix of delays (in Neptune this is given)
         b = np.random.randint(0, max_delay, size=(len(num_nodes),len(num_nodes)))
@@ -501,9 +442,6 @@ class Solver:
         # print("Radius used in KM: ", radius[0])
         user_coords = self.place_users_close_to_nodes(self.num_users, node_coords)
         self.plot(node_coords, user_coords)
-
-        # data.sources = num_nodes
-        # data.nodes = num_nodes
         
         # Amount of request received in time-slot
         for f in range(len(data.functions)):
@@ -515,7 +453,6 @@ class Solver:
         print("--------NODES_LEN [N]--------------",data.nodes)
         print("--------REQUESTS [R]---------------",self.requests_received)
         print("--------M_F_LEN [F]---------------",len(data.function_memory_matrix))
-        #print("--------WORKLOAD [R]---------------",data.workload_matrix)
         
         # Set of requests within coverage of node i
         req_node_coverage = []  
@@ -560,10 +497,8 @@ class Solver:
             for u in range(self.num_users):
                 if self.req_by_user[u][r]==1:
                     live_positions_requests.append(live_positions[0][u])
-        # COVERAGE REQUEST-NODE
-        #radius = np.round(np.random.uniform(0.1,0.15,len(S)),3) # in km
-        # radius = np.full(data.sources, 0.03)
 
+        # COVERAGE REQUEST-NODE
         for i in range(len(data.sources)):
             node_latitude = node_coords[i,0]
             node_longitude = node_coords[i,1]

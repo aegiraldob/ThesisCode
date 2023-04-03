@@ -19,24 +19,18 @@ import math
 class Data():
     sources: List[str] = []
     nodes: List[str] = []
-    functions: List[str] = []   ## ¿¿¿??? (does this represents carts/catalog/shipping/order/etc...?) ## YES
+    functions: List[str] = []
 
     node_memory_matrix: np.array = np.array([])
     function_memory_matrix: np.array = np.array([])
     node_delay_matrix: np.array = np.array([])
     workload_matrix: np.array = np.array([])
     max_delay_matrix: np.array = np.array([]) 
-    response_time_matrix: np.array = np.array([])   # We don't need it because is only use for GPU, right? ## DON'T USE IT
+    response_time_matrix: np.array = np.array([])
     node_cores_matrix: np.array = np.array([])
-    cores_matrix: np.array = np.array([])           # Where is it used? ## DON'T USE IT
-    old_allocations_matrix: np.array = np.array([]) # Where is it used? In our case it would be mat_mul? # IGNORE IT
+    cores_matrix: np.array = np.array([])
+    old_allocations_matrix: np.array = np.array([])
     core_per_req_matrix: np.array = np.array([])
-
-    ### gpu_function_memory_matrix: np.array = np.array([])
-    ### gpu_node_memory_matrix: np.array = np.array([])
-
-    # prev_x = np.array([])  ## Use by neptune for GPU ....
-
 
     def __init__(self, sources: List[str], nodes: List[str], functions: List[str]):
         self.sources = sources
@@ -75,26 +69,6 @@ class Input:
     cpu_actual_allocation: np.array = np.array([])
     cpu_core_per_req: np.array = np.array([])
 
-    # x_cpu = np.array([])
-    # c_cpu = np.array([])
-
-    # gpu_nodes: List[str] = []
-    # gpu_functions: List[str] = []
-
-    # gpu_node_memory_matrix: np.array = np.array([])
-    # gpu_function_memory_matrix: np.array = np.array([])
-    # gpu_node_delay_matrix: np.array = np.array([])
-    # gpu_workload_matrix: np.array = np.array([])
-    # gpu_max_delay_matrix: np.array = np.array([])
-    # gpu_response_time_matrix: np.array = np.array([])
-    # gpu_node_memory: np.array = np.array([])
-    # gpu_function_memory: np.array = np.array([])
-
-    # x_gpu = np.array([])
-    # c_gpu = np.array([])
-
-    # cpu_function_gpu_map = {}
-
     def __init__(self,
                  cpu_nodes: List[str], cpu_functions: List[str],
                  gpu_nodes: List[str], gpu_functions: List[str]):
@@ -105,13 +79,6 @@ class Input:
         self.gpu_functions = gpu_functions
         self.functions = cpu_functions + gpu_functions
         self.nodes = cpu_nodes + gpu_nodes
-        # for i, cpu_f in enumerate(cpu_functions):
-        #     cpu_function = cpu_f[:4]
-        #     for j, gpu_f in enumerate(gpu_functions):
-        #         gpu_function = gpu_f[:4]
-        #         if cpu_function == gpu_function:
-        #             self.cpu_function_gpu_map[i] = j
-        #             break
 
     def load_node_memory_matrix(self, matrix: List[int]):
         self.node_memory_matrix = np.array(matrix, dtype=int)
@@ -178,8 +145,6 @@ class Solver:
     requests_index=[]
     requests_received=0
     req_distribution=[]
-    # moved_from = {}
-    # moved_to = {}
     data: Data = None
     
     transformer = Transformer.from_crs('epsg:3857', 'epsg:4326')
@@ -203,9 +168,9 @@ class Solver:
         size = len(delay_matrix) # No of nodes
         mds_model = manifold.MDS(n_components=2, random_state=0, dissimilarity='precomputed', normalized_stress="auto") # MDS(dissimilarity='precomputed', normalized_stress='auto', random_state=0)
         mds_model.fit(delay_matrix)
-        coords = mds_model.fit_transform(delay_matrix) # [[-711.64291427 -379.86399722][..][..]]
+        coords = mds_model.fit_transform(delay_matrix)
         for i in range(size):
-            coords[i] = self.cartesian_to_geo(*coords[i]) # [[-0.0034123763 -0.0063927971][..][..]]
+            coords[i] = self.cartesian_to_geo(*coords[i])
         return coords
 
     def get_radius(self, coords, scale_factor = 0.9): # The greater the scale_factor the higher the intersection between the nodes
@@ -271,34 +236,20 @@ class Solver:
     def load_input(self, data: Data):
         self.data = data
 
-        ################## MISSING INPUTS ##################
-
-        # # users_location: coordinates of users
-        # users_location = pd.read_csv('users-test.csv') 
-        # N_src = pd.read_csv('serverstest_3.csv')
-
-        ################## MISSING INPUTS ##################
-        # EXAMPLE USAGE
-
         max_delay = 2000 # millis
-        num_nodes = data.sources # random.randint(3, 20) # gen some nodes
-        num_users = 8 # random.randint(num_nodes*2, num_nodes*50) # gen some users
+        num_nodes = data.sources
+        num_users = 8
 
         # creates a diagonal matrix of delays (in Neptune this is given)
         b = np.random.randint(0, max_delay, size=(len(num_nodes),len(num_nodes)))
         delay_matrix = (b + b.T)/2
         np.fill_diagonal(delay_matrix, 0)
 
-        # print("####### DELAY_MATRIX ######")
-        # print(delay_matrix)
         node_coords = self.delay_to_geo(delay_matrix)
         radius = self.get_radius(node_coords)
         #print("Radius used in KM: ", radius[0], "equivalent to degrees:",  radius[1])
         user_coords = self.place_users_close_to_nodes(num_users, node_coords)
         self.plot(node_coords, user_coords)
-
-        # data.sources = num_nodes
-        # data.nodes = num_nodes
 
         # Amount of request received in time-slot
         for f in range(len(data.functions)):
@@ -310,7 +261,6 @@ class Solver:
         print("--------NODES_LEN [N]--------------",data.nodes)
         print("--------REQUESTS [R]---------------",self.requests_received)
         print("--------M_F_LEN [F]---------------",len(data.function_memory_matrix))
-        #print("--------WORKLOAD [R]---------------",data.workload_matrix)
 
         # Set of requests within coverage of node i
         req_node_coverage = []  
@@ -340,9 +290,6 @@ class Solver:
                         dif = dif-1
 
         # COVERAGE REQUEST-NODE
-        #radius = np.round(np.random.uniform(0.1,0.15,len(S)),3) # in km
-        # radius = np.full(data.sources, 0.03)
-
         for i in range(len(data.sources)):
             node_latitude = node_coords[i,0]
             node_longitude = node_coords[i,1]
@@ -388,10 +335,6 @@ class Solver:
                             self.model.Add(
                                 self.x[j, r]==0
                             )         
-
-        # print("m_f -----",  data.function_memory_matrix)
-        # print("M_j -----",  data.node_memory_matrix)
-        # print("U_j -----",  data.node_cores_matrix)
 
         # The sum of the memory of functions deployed on a node `n` is less than its capacity
         for j in range(len(data.nodes)):
